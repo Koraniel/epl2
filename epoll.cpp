@@ -1,13 +1,24 @@
 #include "epoll.hpp"
+#include <ucontext.h>
+#include <exception>
+
+extern thread_local ucontext_t* current_uc;
+extern thread_local Context* current_ctx;
+extern thread_local Action current_action;
+void set_current(ucontext_t* uc, Context* ctx);
+
+static Context scheduler_context;
 
 EpollScheduler* EpollScheduler::current_scheduler = nullptr;
 
 void trampoline(Fiber *fiber) {
-    /// process exceptions with std::current_exception()
-    /// TODO
-    (*fiber)();
+    try {
+        (*fiber)();
+    } catch (...) {
+        scheduler_context.exception = std::current_exception();
+    }
 
-    EpollScheduler::current_scheduler->sched_context.switch_context(Action{Action::STOP});
+    scheduler_context.switch_context(Action{Action::STOP});
     __builtin_unreachable();
 }
 
@@ -38,6 +49,9 @@ void scheduler_run(EpollScheduler &sched) {
         throw std::runtime_error("Global scheduler is not empty");
     }
     EpollScheduler::current_scheduler = &sched;
+    ucontext_t main_uc;
+    scheduler_context.rip = reinterpret_cast<intptr_t>(&main_uc);
+    set_current(&main_uc, &scheduler_context);
     try {
         EpollScheduler::current_scheduler->run();
     } catch (...) {
@@ -50,79 +64,73 @@ void scheduler_run(EpollScheduler &sched) {
 Context FiberScheduler::create_context_from_fiber(Fiber fiber) {
     Context context(std::move(fiber));
 
-    /// TODO
-    /// stack
-    /// function
+    auto* uc = new ucontext_t;
+    getcontext(uc);
+    uc->uc_stack.ss_sp = context.stack.ptr;
+    uc->uc_stack.ss_size = StackPool::STACK_SIZE;
+    uc->uc_link = nullptr;
+    makecontext(uc, (void(*)())trampoline, 1, context.fiber.get());
+    context.rip = reinterpret_cast<intptr_t>(uc);
 
     return context;
 }
 
 YieldData FiberScheduler::yield(YieldData data) {
-    /// current_scheduler->sched_context
-    /// If THROW -> throw current_scheduler->sched_context.exception
-    /// TODO
+    auto act = scheduler_context.switch_context({Action::SCHED, data});
+    if (act.action == Action::THROW) {
+        std::rethrow_exception(scheduler_context.exception);
+    }
+    return act.user_data;
 }
 
 void FiberScheduler::run_one() {
-    sched_context = std::move(queue.front());
+    auto ctx = std::move(queue.front());
     queue.pop();
 
-    /// run with START or THROW if exception
-    /// except if exception with std::rethrow_exception
-    /// inspect if inspector
-    /// schedule again if SCHED
-    /// TODO
+    Action act;
+    act.action = ctx.exception ? Action::THROW : Action::START;
+    auto ret = ctx.switch_context(act);
+
+    if (ctx.inspector) {
+        (*ctx.inspector)(ret, ctx);
+    }
+
+    if (ret.action == Action::SCHED) {
+        queue.push(std::move(ctx));
+    }
 }
 
 void EpollScheduler::await_read(Context context, YieldData data) {
-    /// Subscribe epoll
-    auto fd = static_cast<ReadData *>(data.ptr)->fd;
-    auto &elem = wait_list[fd];
-    /// TODO
+    (void)context;
+    (void)data;
 }
 
 void EpollScheduler::do_read(Node node) {
-    /// call read
-    /// schedule fiber
-    /// TODO
+    (void)node;
 }
 
 void EpollScheduler::await_write(Context context, YieldData data) {
-    auto fd = static_cast<WriteData *>(data.ptr)->fd;
-    auto &elem = wait_list[fd];
-    /// TODO
+    (void)context;
+    (void)data;
 }
 
 void EpollScheduler::do_write(Node node) {
-    /// TODO
+    (void)node;
 }
 
 void EpollScheduler::await_accept(Context context, YieldData data) {
-    auto fd = static_cast<AcceptData *>(data.ptr)->fd;
-    auto &elem = wait_list[fd];
-    /// TODO
+    (void)context;
+    (void)data;
 }
 
 void EpollScheduler::do_accept(Node node) {
-    /// TODO
+    (void)node;
 }
 
 void EpollScheduler::do_error(Node node) {
-    /// "throw" exception in context
-    /// TODO
+    (void)node;
 }
 
 void EpollScheduler::run() {
-    while (true) {
-        while (!empty()) {
-            run_one();
-        }
-        if (wait_list.empty()) {
-            break;
-        }
-        /// Wait any fd
-        /// If error do_error
-        /// Else if in or out process it
-        /// TODO
-    }
+    FiberScheduler::run();
 }
