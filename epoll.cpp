@@ -242,6 +242,7 @@ void EpollScheduler::run() {
         while (!empty()) {
             run_one();
         }
+        cleanup_closed_fds();
         if (wait_list.empty()) {
             break;
         }
@@ -298,5 +299,6 @@ void EpollScheduler::run() {
                 it->second = std::move(rec);
             }
         }
+        cleanup_closed_fds();
     }
 }
