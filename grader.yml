@@ -1,0 +1,6 @@
+editable:
+  - "async.cpp"
+  - "epoll.cpp"
+  - "fibers.cpp"
+name: "epllov"
+score_file: "res.txt"
