@@ -3,6 +3,8 @@
 #include <sys/socket.h>
 
 #include "scheduler.hpp"
+#include <unordered_map>
+#include <optional>
 
 struct ReadData {
     int fd;
@@ -80,3 +82,10 @@ private:
 
 void schedule(Fiber fiber);
 void yield();
+template <class Inspector, class... Args>
+void create_current_fiber_inspector(Args... args) {
+    if (!EpollScheduler::current_scheduler) {
+        throw std::runtime_error("Global scheduler is empty");
+    }
+    EpollScheduler::current_scheduler->create_current_fiber_inspector<Inspector>(args...);
+}
