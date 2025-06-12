@@ -1,6 +1,6 @@
 build: CMakeLists.txt
 	mkdir -p build
-	cd build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugIngo
+	cd build && cmake .. -DCMAKE_BUILD_TYPE=RelWithDebugInfo
 
 build/tests: build *.cpp *.hpp
 	cd build && make tests -j `nproc`
