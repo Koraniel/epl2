@@ -129,7 +129,6 @@ void EpollScheduler::do_read(Node node) {
     ssize_t r = ::read(node.fd, rd->data, rd->size);
     if (r < 0) {
         node.context.exception = std::make_exception_ptr(std::runtime_error(strerror(errno)));
-        delete rd;
     } else {
         node.context.yield_data.ss = r;
     }
@@ -165,7 +164,6 @@ void EpollScheduler::do_write(Node node) {
     ssize_t w = ::write(node.fd, wd->data, wd->size);
     if (w < 0) {
         node.context.exception = std::make_exception_ptr(std::runtime_error(strerror(errno)));
-        delete wd;
     } else {
         node.context.yield_data.ss = w;
     }
@@ -201,7 +199,6 @@ void EpollScheduler::do_accept(Node node) {
     int r = ::accept(node.fd, ad->addr, ad->addrlen);
     if (r < 0) {
         node.context.exception = std::make_exception_ptr(std::runtime_error(strerror(errno)));
-        delete ad;
     } else {
         node.context.yield_data.i = r;
         fcntl(r, F_SETFL, fcntl(r, F_GETFL, 0) | O_NONBLOCK);
@@ -210,13 +207,6 @@ void EpollScheduler::do_accept(Node node) {
 }
 
 void EpollScheduler::do_error(Node node) {
-    if (node.callback == &EpollScheduler::do_read) {
-        delete static_cast<ReadData*>(node.data.ptr);
-    } else if (node.callback == &EpollScheduler::do_write) {
-        delete static_cast<WriteData*>(node.data.ptr);
-    } else if (node.callback == &EpollScheduler::do_accept) {
-        delete static_cast<AcceptData*>(node.data.ptr);
-    }
     node.context.exception = std::make_exception_ptr(std::runtime_error("epoll error"));
     schedule(std::move(node.context));
 }
