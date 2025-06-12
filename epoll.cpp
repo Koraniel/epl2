@@ -68,6 +68,7 @@ Context FiberScheduler::create_context_from_fiber(Fiber fiber) {
     uc->uc_link = nullptr;
     makecontext(uc, (void(*)())trampoline, 1, context.fiber.get());
     context.rip = reinterpret_cast<intptr_t>(uc);
+    context.uc = uc;
 
     return context;
 }
@@ -81,7 +82,7 @@ YieldData FiberScheduler::yield(YieldData data) {
 }
 
 void FiberScheduler::run_one() {
-    auto ctx = std::move(queue.front());
+    sched_context = std::move(queue.front());
     queue.pop();
 
     Action act;
