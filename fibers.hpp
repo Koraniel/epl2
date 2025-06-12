@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "stack_pool.hpp"
+#include <ucontext.h>
 
 
 using Fiber = std::function<void()>;
@@ -39,6 +40,7 @@ class Inspector;
 struct Context {
     std::unique_ptr<Fiber> fiber;
     StackPool::Stack stack;
+    ucontext_t *uc = nullptr;
 
     intptr_t rip = 0;
     intptr_t rsp = 0;
@@ -48,13 +50,15 @@ struct Context {
 
     Context() = default;
 
+    ~Context();
+
     explicit Context(Fiber fiber);
 
-    Context(Context &&other) = default;
+    Context(Context &&other) noexcept;
 
     Context(const Context &other) = delete;
 
-    Context &operator=(Context &&other) = default;
+    Context &operator=(Context &&other) noexcept;
 
     void operator=(const Context &other) = delete;
 

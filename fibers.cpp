@@ -19,6 +19,42 @@ Context::Context(Fiber fiber)
           rsp(reinterpret_cast<intptr_t>(stack.ptr) + StackPool::STACK_SIZE) {
 }
 
+Context::~Context() {
+    delete uc;
+}
+
+Context::Context(Context &&other) noexcept
+        : fiber(std::move(other.fiber)),
+          stack(std::move(other.stack)),
+          uc(other.uc),
+          rip(other.rip),
+          rsp(other.rsp),
+          inspector(std::move(other.inspector)),
+          exception(std::move(other.exception)),
+          yield_data(other.yield_data) {
+    other.uc = nullptr;
+    other.rip = 0;
+    other.rsp = 0;
+}
+
+Context &Context::operator=(Context &&other) noexcept {
+    if (this != &other) {
+        fiber = std::move(other.fiber);
+        stack = std::move(other.stack);
+        delete uc;
+        uc = other.uc;
+        rip = other.rip;
+        rsp = other.rsp;
+        inspector = std::move(other.inspector);
+        exception = std::move(other.exception);
+        yield_data = other.yield_data;
+        other.uc = nullptr;
+        other.rip = 0;
+        other.rsp = 0;
+    }
+    return *this;
+}
+
 Action Context::switch_context(Action action) {
     auto* to_uc = reinterpret_cast<ucontext_t*>(rip);
     if (!to_uc) {
