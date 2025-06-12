@@ -75,6 +75,9 @@ public:
 
     void run() override;
 
+    /// Remove any entries associated with closed file descriptors
+    void cleanup_closed_fds();
+
 private:
     std::unordered_map<int, Events> wait_list;
     int epoll_fd;

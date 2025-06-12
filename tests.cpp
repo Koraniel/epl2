@@ -438,6 +438,8 @@ void test_supertest() {
                 }
                 shutdown(client_fd, SHUT_RD);
                 shutdown(server_fd, SHUT_WR);
+                close(client_fd);
+                close(server_fd);
             };
             auto server_to_client = [=]() {
                 std::vector<char> buf(1024);
@@ -454,6 +456,8 @@ void test_supertest() {
                 }
                 shutdown(server_fd, SHUT_RD);
                 shutdown(client_fd, SHUT_WR);
+                close(server_fd);
+                close(client_fd);
             };
             schedule(client_to_server);
             schedule(server_to_client);
@@ -491,8 +495,9 @@ void test_supertest() {
                     assert(r > 0);
                     last += r;
                 } else {
-                    assert(last == 0);
-                    return "";
+                    std::string line(buf.data(), last);
+                    last = 0;
+                    return line;
                 }
             }
         }

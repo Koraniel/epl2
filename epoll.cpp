@@ -212,10 +212,33 @@ void EpollScheduler::do_error(Node node) {
     schedule(std::move(node.context));
 }
 
+void EpollScheduler::cleanup_closed_fds() {
+    for (auto it = wait_list.begin(); it != wait_list.end(); ) {
+        if (fcntl(it->first, F_GETFD) == -1 && errno == EBADF) {
+            auto rec = std::move(it->second);
+            if (rec.in) {
+                Node n = std::move(*rec.in);
+                n.context.exception = std::make_exception_ptr(std::runtime_error("fd closed"));
+                schedule(std::move(n.context));
+            }
+            if (rec.out) {
+                Node n = std::move(*rec.out);
+                n.context.exception = std::make_exception_ptr(std::runtime_error("fd closed"));
+                schedule(std::move(n.context));
+            }
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, it->first, nullptr);
+            it = wait_list.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 void EpollScheduler::run() {
     const int MAX_EVENTS = 64;
     struct epoll_event events[MAX_EVENTS];
     while (true) {
+        cleanup_closed_fds();
         while (!empty()) {
             run_one();
         }
