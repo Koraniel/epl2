@@ -81,7 +81,7 @@ YieldData FiberScheduler::yield(YieldData data) {
 }
 
 void FiberScheduler::run_one() {
-    sched_context = std::move(queue.front());
+    auto ctx = std::move(queue.front());
     queue.pop();
 
     Action act;
